@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Be10X Sales Data File Maker</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<style>
+  :root{
+    --bg:#0f1020; --bg2:#15172b; --card:#1b1e36; --card2:#21243f;
+    --ink:#e8e9f5; --muted:#9aa0c4; --line:#2c2f4f;
+    --accent:#7c5cff; --accent2:#a78bfa; --accent-ink:#ffffff;
+    --good:#34d399; --warn:#fbbf24; --bad:#f87171;
+    --radius:16px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,system-ui,sans-serif;
+    background:radial-gradient(1200px 600px at 80% -10%, #241f4d 0%, transparent 60%),
+               radial-gradient(900px 500px at -10% 10%, #18203f 0%, transparent 55%),
+               #0e0f1e;
+    color:var(--ink); line-height:1.5; min-height:100vh;
+    padding:28px 16px 64px;
+  }
+  .wrap{max-width:760px;margin:0 auto}
+  header.top{margin-bottom:22px}
+  .eyebrow{font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent2);font-weight:700}
+  h1{font-size:27px;margin:6px 0 6px;letter-spacing:-.02em;font-weight:800}
+  .sub{color:var(--muted);font-size:15px;margin:0;max-width:60ch}
+  .privacy{
+    display:inline-flex;align-items:center;gap:7px;margin-top:14px;
+    font-size:12.5px;color:var(--good);background:rgba(52,211,153,.08);
+    border:1px solid rgba(52,211,153,.25);padding:6px 11px;border-radius:999px;
+  }
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--good);box-shadow:0 0 0 4px rgba(52,211,153,.15)}
+
+  .card{
+    background:linear-gradient(180deg, rgba(255,255,255,.025), rgba(255,255,255,0)) , var(--card);
+    border:1px solid var(--line); border-radius:var(--radius);
+    padding:20px; margin-top:16px;
+  }
+  .card h2{font-size:13px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin:0 0 14px;font-weight:700}
+  .step-n{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:6px;background:var(--accent);color:#fff;font-size:12px;font-weight:800;margin-right:8px}
+
+  /* drop zone */
+  .drop{
+    border:1.5px dashed var(--line); border-radius:13px; padding:26px 18px; text-align:center;
+    cursor:pointer; transition:.15s border-color,.15s background; background:rgba(124,92,255,.03);
+  }
+  .drop:hover,.drop.drag{border-color:var(--accent);background:rgba(124,92,255,.10)}
+  .drop .big{font-size:15.5px;font-weight:650}
+  .drop .small{color:var(--muted);font-size:13px;margin-top:5px}
+  .drop svg{opacity:.85;margin-bottom:8px}
+  input[type=file]{display:none}
+
+  .files{margin-top:14px;display:flex;flex-direction:column;gap:8px}
+  .chip{
+    display:flex;align-items:center;gap:10px;background:var(--bg2);border:1px solid var(--line);
+    border-radius:10px;padding:9px 11px;font-size:13.5px;
+  }
+  .chip .ic{width:26px;height:26px;border-radius:7px;display:grid;place-items:center;background:rgba(124,92,255,.16);color:var(--accent2);font-size:11px;font-weight:800;flex:0 0 auto}
+  .chip .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .chip .sz{color:var(--muted);font-size:12px;flex:0 0 auto}
+  .chip button{background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;line-height:1;padding:0 2px;flex:0 0 auto}
+  .chip button:hover{color:var(--bad)}
+
+  /* inputs */
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:13px}
+  label.field{display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--muted);font-weight:600}
+  label.field .req{color:var(--accent2)}
+  input[type=text]{
+    background:var(--bg2);border:1px solid var(--line);border-radius:10px;color:var(--ink);
+    padding:10px 12px;font-size:14px;font-family:inherit;outline:none;transition:.15s border-color,.15s box-shadow;
+  }
+  input[type=text]::placeholder{color:#6a6f96}
+  input[type=text]:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(124,92,255,.18)}
+  .hint{font-size:11.5px;color:#6a6f96;font-weight:500;margin-top:-2px}
+
+  .optrow{display:flex;flex-wrap:wrap;align-items:center;gap:16px;margin-top:14px}
+  .check{display:flex;align-items:center;gap:9px;font-size:13.5px;color:var(--ink);cursor:pointer;user-select:none}
+  .check input{width:17px;height:17px;accent-color:var(--accent)}
+
+  .testblock{margin-top:16px;padding:14px;border:1px dashed var(--line);border-radius:12px;background:rgba(124,92,255,.03)}
+  .testhdr{font-size:12.5px;font-weight:700;color:var(--ink);margin-bottom:11px}
+  .testhdr span{color:var(--muted);font-weight:500;margin-left:7px}
+
+  .go{
+    margin-top:18px;width:100%;border:none;border-radius:12px;cursor:pointer;
+    background:linear-gradient(180deg,var(--accent),#6a49f5);color:#fff;
+    font-size:15.5px;font-weight:750;padding:14px;letter-spacing:.01em;
+    transition:.15s transform,.15s opacity,.15s box-shadow;box-shadow:0 8px 22px -10px rgba(124,92,255,.8);
+  }
+  .go:hover:not(:disabled){transform:translateY(-1px)}
+  .go:active:not(:disabled){transform:translateY(0)}
+  .go:disabled{opacity:.45;cursor:not-allowed;box-shadow:none}
+
+  .status{margin-top:14px;display:none;align-items:center;gap:11px;color:var(--muted);font-size:14px}
+  .status.show{display:flex}
+  .spin{width:18px;height:18px;border:2.5px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:sp .7s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
+
+  .banner{display:none;margin-top:14px;border-radius:11px;padding:12px 14px;font-size:13.5px;border:1px solid}
+  .banner.show{display:block}
+  .banner.err{background:rgba(248,113,113,.08);border-color:rgba(248,113,113,.3);color:#fca5a5}
+
+  /* results */
+  .result{display:none}
+  .result.show{display:block}
+  .stats{display:grid;grid-template-columns:repeat(2,1fr);gap:11px;margin-bottom:14px}
+  .stat{background:var(--bg2);border:1px solid var(--line);border-radius:11px;padding:13px}
+  .stat .v{font-size:23px;font-weight:800;letter-spacing:-.02em}
+  .stat .k{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-top:2px}
+  .stat.good .v{color:var(--good)} .stat.warn .v{color:var(--warn)}
+  .meta{font-size:12.5px;color:var(--muted);margin:2px 0 14px}
+  .meta b{color:var(--ink);font-weight:650}
+  .filelist{font-size:12.5px;color:var(--muted);background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:14px}
+  .filelist div{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:3px 0}
+  .filelist .n{color:var(--ink);font-variant-numeric:tabular-nums;white-space:nowrap}
+  .filelist .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .filelist a{color:var(--accent2);text-decoration:none;font-weight:700;white-space:nowrap}
+  .filelist a:hover{text-decoration:underline}
+  .listhdr{font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:700;margin:2px 0 7px}
+
+  .preview{overflow:auto;border:1px solid var(--line);border-radius:10px;margin-bottom:14px}
+  table{border-collapse:collapse;font-size:11.5px;width:100%;white-space:nowrap}
+  th,td{padding:7px 9px;border-bottom:1px solid var(--line);text-align:left}
+  th{background:var(--bg2);color:var(--muted);font-weight:700;position:sticky;top:0}
+  td{color:var(--ink);font-variant-numeric:tabular-nums}
+  tr:last-child td{border-bottom:none}
+
+  .dl{display:inline-flex;align-items:center;gap:8px;background:rgba(52,211,153,.1);border:1px solid rgba(52,211,153,.35);color:var(--good);font-weight:700;font-size:14px;border-radius:11px;padding:11px 16px;cursor:pointer}
+  .dl:hover{background:rgba(52,211,153,.18)}
+
+  footer{color:#5b6086;font-size:12px;text-align:center;margin-top:26px;line-height:1.7}
+  footer code{background:var(--bg2);border:1px solid var(--line);padding:1px 6px;border-radius:6px;color:var(--muted)}
+  @media(max-width:560px){ .grid{grid-template-columns:1fr} h1{font-size:23px} }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div class="eyebrow">WATI Broadcast</div>
+    <h1>Be10X Sales Data File Maker</h1>
+    <p class="sub">Drop your LeadSquared lead exports, set the broadcast values, and download a ready-to-upload WATI CSV.</p>
+    <div class="privacy"><span class="dot"></span> Runs entirely in your browser — no file ever leaves your device</div>
+  </header>
+
+  <!-- 1: FILES -->
+  <section class="card">
+    <h2><span class="step-n">1</span>Add export files</h2>
+    <div class="drop" id="drop">
+      <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+      <div class="big">Drag &amp; drop files here</div>
+      <div class="small">or <u>browse</u> — accepts <b>.csv</b> and <b>.zip</b>, multiple files</div>
+    </div>
+    <input type="file" id="picker" accept=".csv,.zip" multiple />
+    <div class="files" id="files"></div>
+  </section>
+
+  <!-- 2: VALUES -->
+  <section class="card">
+    <h2><span class="step-n">2</span>Broadcast values for this batch</h2>
+    <div class="grid">
+      <label class="field">time <span class="req">*</span>
+        <input type="text" id="time" value="7.00 PM" />
+      </label>
+      <label class="field">calendar <span class="req">*</span>
+        <input type="text" id="calendar" value="Calendar-Wed-G1" />
+      </label>
+      <label class="field">Zoom registration link <span class="req">*</span>
+        <input type="text" id="zoomads" placeholder="https://zoom.us/webinar/register/WN_XsI_PS1HSwWLUnpUV1gMcg" />
+        <span class="hint">Paste the full Zoom link — only the WN_… code is written to the CSV</span>
+        <span class="hint" id="zoomads_out" style="color:var(--accent2);font-weight:600"></span>
+      </label>
+      <label class="field">zoomid <span class="req">*</span>
+        <input type="text" id="zoomid" placeholder="921 0559 0433" />
+        <span class="hint">Formatted webinar ID</span>
+      </label>
+    </div>
+    <div class="optrow">
+      <label class="field" style="flex:1;min-width:160px">Output file name
+        <input type="text" id="outname" value="be10x_sales_data.csv" />
+      </label>
+      <label class="field" style="width:150px">Max file size (MB)
+        <input type="text" id="maxmb" value="2" inputmode="decimal" />
+        <span class="hint">WATI limit — splits if larger</span>
+      </label>
+      <label class="check"><input type="checkbox" id="dropblank" checked /> Drop rows with no phone number</label>
+    </div>
+
+    <div class="testblock">
+      <div class="testhdr">Test contact <span>optional — added as the first row of the CSV</span></div>
+      <div class="grid">
+        <label class="field">Test phone
+          <input type="text" id="testphone" placeholder="9876543210" />
+          <span class="hint">Country code 91 is assumed if you don't include one</span>
+        </label>
+        <label class="field">Test email
+          <input type="text" id="testemail" placeholder="you@be10x.in" />
+        </label>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3: CONVERT -->
+  <section class="card">
+    <h2><span class="step-n">3</span>Generate</h2>
+    <button class="go" id="go" disabled>Add files and fill all four values</button>
+    <div class="status" id="status"><div class="spin"></div><span id="statustext">Working…</span></div>
+    <div class="banner err" id="error"></div>
+
+    <div class="result" id="result">
+      <div class="stats">
+        <div class="stat good"><div class="v" id="s_total">0</div><div class="k">Lead rows</div></div>
+        <div class="stat"><div class="v" id="s_files">0</div><div class="k">Output files</div></div>
+        <div class="stat warn"><div class="v" id="s_dropped">0</div><div class="k">Blank-phone rows</div></div>
+        <div class="stat"><div class="v" id="s_naemail">0</div><div class="k">Emails as N/A</div></div>
+      </div>
+      <div class="meta" id="s_test" style="display:none">✓ Row 1 of every file is your test contact: <b id="s_testinfo"></b></div>
+      <div class="meta">Top country codes: <b id="s_cc">—</b></div>
+
+      <div class="listhdr" id="s_outhdr">Output files</div>
+      <div class="filelist" id="s_outfiles"></div>
+      <div class="meta" id="s_dlnote" style="display:none">Each part downloads as its own CSV. Your browser may ask to allow multiple downloads — click <b>Allow</b>. You can also use the per-file links above.</div>
+
+      <div class="listhdr">Rows per source file</div>
+      <div class="filelist" id="s_perfile"></div>
+
+      <div class="preview"><table id="s_preview"></table></div>
+      <button class="dl" id="dl">↓ Download</button>
+    </div>
+  </section>
+
+  <footer>
+    Free to host on GitHub Pages — commit this as <code>index.html</code> and enable Pages.<br/>
+    Name is left blank · AllowBroadcast &amp; AllowSMS are TRUE · missing emails become N/A · no de-duplication.
+  </footer>
+</div>
+
+<script>
+"use strict";
+(function(){
+  const WATI_HEADER = "Name,CountryCode,Phone,AllowBroadcast,AllowSMS,emailid,time,calendar,zoomads,zoomid";
+  const $ = id => document.getElementById(id);
+
+  let selected = [];          // {file, key}
+  let lastFiles = [];
+
+  // ---------- transform helpers (identical logic to the Python script) ----------
+  function parsePhone(raw){
+    let s = (raw==null?"":String(raw)).trim();
+    s = s.replace(/^'+/, "").replace(/'+$/, "");
+    s = s.trim().replace(/\+/g, "");
+    const parts = s.split(/\s+/).filter(Boolean);
+    let cc="", local="";
+    if(parts.length>=2){ cc=parts[0]; local=parts.slice(1).join(""); }
+    else if(parts.length===1){ local=parts[0]; }
+    return [cc.replace(/\D/g,""), local.replace(/\D/g,"")];
+  }
+  function esc(v){ v=(v==null?"":String(v)); return /[",\r\n]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v; }
+  // Pull the WN_… registration code out of a full Zoom link (or pass a bare code through).
+  function extractZoomCode(v){
+    v=(v==null?"":String(v)).trim();
+    const m=v.match(/WN_[A-Za-z0-9_-]+/);
+    if(m) return m[0];
+    if(v.indexOf("/register/")!==-1){
+      const seg=v.split("/register/").pop().split(/[?#\/\s]/)[0];
+      if(seg) return seg;
+    }
+    return v;
+  }
+  // Parse the manual test phone; assume country code 91 when none is given.
+  function parseTestPhone(raw){ let [cc,local]=parsePhone(raw); if(local && !cc) cc="91"; return [cc,local]; }
+  function bytesOf(str){ return new TextEncoder().encode(str).length; }
+  // Split data rows into <=maxBytes files; header + optional test row lead every file.
+  function splitParts(header, testLine, dataLines, maxBytes){
+    const headerBlock = header + "\r\n" + (testLine ? testLine + "\r\n" : "");
+    const overhead = bytesOf(headerBlock);
+    const parts=[]; let cur=[headerBlock], curBytes=overhead, curRows=0;
+    for(const line of dataLines){
+      const lb = bytesOf(line + "\r\n");
+      if(curRows>0 && curBytes + lb > maxBytes){
+        parts.push({text:cur.join(""), rows:curRows});
+        cur=[headerBlock]; curBytes=overhead; curRows=0;
+      }
+      cur.push(line + "\r\n"); curBytes += lb; curRows++;
+    }
+    if(curRows>0 || parts.length===0){ parts.push({text:cur.join(""), rows:curRows}); }
+    return parts;
+  }
+  function keyMapFrom(keys){ const m={}; keys.forEach(k=>{ m[k.trim().toLowerCase()]=k; }); return m; }
+  function fmtSize(b){ if(b<1024)return b+" B"; if(b<1048576)return (b/1024).toFixed(0)+" KB"; return (b/1048576).toFixed(1)+" MB"; }
+
+  // ---------- file list UI ----------
+  function renderFiles(){
+    const box=$("files"); box.innerHTML="";
+    selected.forEach((it,i)=>{
+      const ext=(it.file.name.split(".").pop()||"").toUpperCase();
+      const row=document.createElement("div"); row.className="chip";
+      row.innerHTML='<div class="ic">'+ext+'</div><div class="nm"></div><div class="sz">'+fmtSize(it.file.size)+'</div><button title="Remove">&times;</button>';
+      row.querySelector(".nm").textContent=it.file.name;
+      row.querySelector("button").onclick=()=>{ selected.splice(i,1); renderFiles(); refreshGo(); };
+      box.appendChild(row);
+    });
+    refreshGo();
+  }
+  function addFiles(list){
+    for(const f of list){
+      const n=(f.name||"").toLowerCase();
+      if(!(n.endsWith(".csv")||n.endsWith(".zip"))) continue;
+      const key=f.name+"|"+f.size;
+      if(selected.some(s=>s.key===key)) continue;
+      selected.push({file:f,key});
+    }
+    renderFiles();
+  }
+
+  function valuesFilled(){
+    return $("time").value.trim() && $("calendar").value.trim() && $("zoomads").value.trim() && $("zoomid").value.trim();
+  }
+  function refreshGo(){
+    const ok = selected.length>0 && valuesFilled();
+    const btn=$("go"); btn.disabled=!ok;
+    if(selected.length===0) btn.textContent="Add at least one file";
+    else if(!valuesFilled()) btn.textContent="Fill all four broadcast values";
+    else btn.textContent="Generate WATI CSV  →";
+  }
+
+  // ---------- drag & drop ----------
+  const drop=$("drop");
+  drop.onclick=()=>$("picker").click();
+  $("picker").onchange=e=>{ addFiles(e.target.files); e.target.value=""; };
+  ["dragenter","dragover"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add("drag");}));
+  ["dragleave","drop"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove("drag");}));
+  drop.addEventListener("drop",e=>{ if(e.dataTransfer&&e.dataTransfer.files) addFiles(e.dataTransfer.files); });
+  ["time","calendar","zoomads","zoomid"].forEach(id=>$(id).addEventListener("input",refreshGo));
+  function updateZoomPreview(){
+    const raw=$("zoomads").value.trim(), outEl=$("zoomads_out");
+    if(!raw){ outEl.textContent=""; return; }
+    const code=extractZoomCode(raw);
+    outEl.textContent = code ? "→ saved to zoomads: "+code : "";
+  }
+  $("zoomads").addEventListener("input",updateZoomPreview);
+
+  // ---------- parse a File/Blob with PapaParse (streamed, UI stays responsive) ----------
+  function parseFile(file, label, onRow){
+    return new Promise((resolve,reject)=>{
+      let n=0, km=null;
+      Papa.parse(file,{
+        header:true, skipEmptyLines:"greedy",
+        chunk(results){
+          const rows=results.data;
+          if(rows.length && !km) km=keyMapFrom(Object.keys(rows[0]));
+          for(const row of rows){ onRow(row, km); n++; }
+        },
+        complete(){ resolve(n); },
+        error(err){ reject(err); }
+      });
+    });
+  }
+
+  // ---------- main ----------
+  function showError(msg){ const b=$("error"); b.textContent=msg; b.classList.add("show"); }
+  function clearError(){ $("error").classList.remove("show"); }
+  function setStatus(t){ $("statustext").textContent=t; }
+
+  async function run(){
+    if($("go").disabled) return;
+    if(typeof JSZip==="undefined" || typeof Papa==="undefined"){
+      showError("Couldn't load the CSV/ZIP libraries (are you online?). Refresh and try again."); return;
+    }
+    clearError();
+    $("result").classList.remove("show");
+    $("go").disabled=true;
+    $("status").classList.add("show");
+
+    const BATCH={ time:$("time").value.trim(), calendar:$("calendar").value.trim(),
+                  zoomads:extractZoomCode($("zoomads").value.trim()), zoomid:$("zoomid").value.trim() };
+    const dropBlank=$("dropblank").checked;
+
+    const out=[];                 // CSV data lines
+    let total=0, dropped=0, naEmail=0;
+    const ccCount={}, perFile=[];
+
+    // optional manual test contact -> prepended as the first data row
+    const [tcc,tlocal]=parseTestPhone($("testphone").value.trim());
+    const testEmail=$("testemail").value.trim();
+    let testLine=null, testInfo="";
+    if(tlocal){
+      testLine=["",tcc,tlocal,"TRUE","TRUE",(testEmail||"N/A"),
+                BATCH.time,BATCH.calendar,BATCH.zoomads,BATCH.zoomid].map(esc).join(",");
+      testInfo=tcc+" "+tlocal+"  ·  "+(testEmail||"N/A");
+    }
+
+    function transform(row, km){
+      const phoneRaw = km["phone number"]!==undefined ? row[km["phone number"]] : "";
+      const emailRaw = km["email"]!==undefined ? row[km["email"]] : "";
+      const [cc,local]=parsePhone(phoneRaw);
+      if(!local && dropBlank){ dropped++; return; }
+      const email=(emailRaw==null?"":String(emailRaw)).trim();
+      out.push([ "", cc, local, "TRUE", "TRUE", (email||"N/A"),
+                 BATCH.time, BATCH.calendar, BATCH.zoomads, BATCH.zoomid ].map(esc).join(","));
+      total++;
+      if(!email) naEmail++;
+      const k=cc||"(none)"; ccCount[k]=(ccCount[k]||0)+1;
+    }
+
+    try{
+      // deterministic order: sort by filename
+      const ordered=[...selected].sort((a,b)=>a.file.name.localeCompare(b.file.name));
+      let idx=0;
+      for(const it of ordered){
+        idx++;
+        const name=it.file.name, lower=name.toLowerCase();
+        if(lower.endsWith(".zip")){
+          setStatus(`Reading ${name} (${idx}/${ordered.length})…`);
+          await new Promise(r=>setTimeout(r,15));
+          const zip=await JSZip.loadAsync(it.file);
+          const entries=Object.keys(zip.files)
+            .filter(nm=>!zip.files[nm].dir && nm.toLowerCase().endsWith(".csv")).sort();
+          if(entries.length===0){ showError(`${name} contains no CSV files.`); }
+          for(const en of entries){
+            const label=name+" › "+en;
+            setStatus(`Processing ${label}…`);
+            await new Promise(r=>setTimeout(r,15));
+            const before=total+dropped;
+            const blob=await zip.files[en].async("blob");
+            const fileLike=new File([blob], "x.csv", {type:"text/csv"});
+            await parseFile(fileLike, label, transform);
+            perFile.push([label, total+dropped-before]);
+          }
+        } else {
+          const label=name;
+          setStatus(`Processing ${label} (${idx}/${ordered.length})…`);
+          await new Promise(r=>setTimeout(r,15));
+          const before=total+dropped;
+          await parseFile(it.file, label, transform);
+          perFile.push([label, total+dropped-before]);
+        }
+      }
+
+      // (the test contact is added separately to every split file below)
+      if(total===0 && !testLine){ throw new Error("No rows were produced. Check that the files have a 'Phone Number' column, or untick 'Drop rows with no phone number'."); }
+
+      // split into <= maxBytes parts; the test row repeats as row 1 of each part
+      setStatus("Building file(s)…");
+      await new Promise(r=>setTimeout(r,15));
+      const maxBytes=Math.max(50000,(parseFloat($("maxmb").value)||2)*1e6);
+      let base=($("outname").value.trim()||"be10x_sales_data.csv").replace(/\.csv$/i,"");
+      if(!base) base="be10x_sales_data";
+      const parts=splitParts(WATI_HEADER, testLine, out, maxBytes);
+
+      // clean previous urls, build blobs + urls per part
+      lastFiles.forEach(f=>{ if(f.url) URL.revokeObjectURL(f.url); });
+      lastFiles=parts.map((p,i)=>{
+        const name = parts.length===1 ? base+".csv" : base+"_part"+(i+1)+".csv";
+        const blob = new Blob([p.text],{type:"text/csv;charset=utf-8"});
+        return {name, blob, url:URL.createObjectURL(blob), rows:p.rows, bytes:blob.size};
+      });
+
+      // stats
+      $("s_total").textContent=total.toLocaleString();
+      $("s_files").textContent=lastFiles.length;
+      $("s_dropped").textContent=dropped.toLocaleString()+(dropBlank?"":" kept");
+      $("s_naemail").textContent=naEmail.toLocaleString();
+      const top=Object.entries(ccCount).sort((a,b)=>b[1]-a[1]).slice(0,8)
+                 .map(([c,n])=>`${c}=${n.toLocaleString()}`).join("  ·  ");
+      $("s_cc").textContent=top||"—";
+      if(testLine){ $("s_test").style.display="block"; $("s_testinfo").textContent=testInfo; }
+      else { $("s_test").style.display="none"; }
+
+      // output files list with per-file download links
+      const of=$("s_outfiles"); of.innerHTML="";
+      lastFiles.forEach(f=>{
+        const d=document.createElement("div");
+        const nm=document.createElement("span"); nm.className="nm"; nm.textContent=f.name;
+        const info=document.createElement("span"); info.className="n";
+        info.textContent=f.rows.toLocaleString()+" rows · "+fmtSize(f.bytes);
+        const a=document.createElement("a"); a.href=f.url; a.download=f.name; a.textContent="↓ download";
+        d.appendChild(nm); d.appendChild(info); d.appendChild(a); of.appendChild(d);
+      });
+      $("s_outhdr").textContent = lastFiles.length>1
+        ? ("Output files — "+lastFiles.length+" parts, each ≤ "+(maxBytes/1e6)+" MB")
+        : "Output file";
+
+      // source-file list
+      const fl=$("s_perfile"); fl.innerHTML="";
+      perFile.forEach(([lbl,n])=>{ const d=document.createElement("div");
+        const nm=document.createElement("span"); nm.className="nm"; nm.textContent=lbl;
+        const info=document.createElement("span"); info.className="n"; info.textContent=n.toLocaleString()+" rows";
+        d.appendChild(nm); d.appendChild(info); fl.appendChild(d); });
+
+      // preview (first file: header + first 5 rows, incl. the test row)
+      const tbl=$("s_preview"); tbl.innerHTML="";
+      const cols=WATI_HEADER.split(",");
+      const plines=parts[0].text.split("\r\n").filter(Boolean);
+      const thead="<tr>"+cols.map(c=>"<th>"+c+"</th>").join("")+"</tr>";
+      const body=plines.slice(1,6).map(line=>{
+        const cells=line.split(",");
+        return "<tr>"+cells.map(c=>"<td>"+(c||"").replace(/^"|"$/g,"")+"</td>").join("")+"</tr>";
+      }).join("");
+      tbl.innerHTML=thead+body;
+
+      // button label + auto-download
+      $("dl").textContent = lastFiles.length>1 ? ("↓ Download all "+lastFiles.length+" files") : "↓ Download CSV again";
+      $("s_dlnote").style.display = lastFiles.length>1 ? "block" : "none";
+      $("status").classList.remove("show");
+      $("result").classList.add("show");
+      primaryDownload();
+    }catch(err){
+      $("status").classList.remove("show");
+      showError("Error: "+(err && err.message ? err.message : err));
+    }finally{
+      refreshGo();
+    }
+  }
+
+  function downloadBlob(url, name){ const a=document.createElement("a"); a.href=url; a.download=name; document.body.appendChild(a); a.click(); a.remove(); }
+  function primaryDownload(){
+    // download every CSV individually (no zip); stagger so the browser doesn't drop any
+    lastFiles.forEach((f,i)=>{ setTimeout(()=>downloadBlob(f.url, f.name), i*400); });
+  }
+  $("dl").onclick=primaryDownload;
+  $("go").onclick=run;
+  refreshGo();
+  updateZoomPreview();
+})();
+</script>
+</body>
+</html>
